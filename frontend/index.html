@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Airports Map - TP6 NoSQL</title>
+    
+    <!-- Google Fonts: Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --text-main: #ffffff;
+            --text-muted: #a0a0a0;
+            --accent: #4ade80;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            background-color: #121212;
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        #map {
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* Título Flotante */
+        .header-panel {
+            position: absolute;
+            top: 20px;
+            left: 50px;
+            z-index: 1000;
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 20px 30px;
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .header-panel h2 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(90deg, #fff, #a5b4fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-panel p {
+            margin: 0;
+            font-size: 14px;
+            color: #d1d5db;
+        }
+
+        .btn-popular {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            align-self: flex-start;
+            margin-top: 5px;
+        }
+
+        .btn-popular:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        /* Sidebar de Popularidad */
+        .sidebar {
+            position: absolute;
+            top: 0;
+            right: -400px;
+            width: 350px;
+            height: 100vh;
+            z-index: 2000;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-left: 1px solid var(--glass-border);
+            transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+        }
+
+        .sidebar.open {
+            right: 0;
+        }
+
+        .sidebar-header {
+            padding: 25px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-header h3 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .close-btn:hover {
+            color: #f87171;
+        }
+
+        .ranking-list {
+            padding: 20px;
+            overflow-y: auto;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .ranking-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .ranking-card:hover {
+            transform: scale(1.02);
+            background: rgba(255,255,255,0.08);
+        }
+
+        .rank-number {
+            font-size: 24px;
+            font-weight: 800;
+            color: #8b5cf6;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .rank-info {
+            flex-grow: 1;
+        }
+
+        .rank-name {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0 0 4px 0;
+            color: #fff;
+        }
+
+        .rank-city {
+            font-size: 13px;
+            color: #cbd5e1;
+            margin: 0;
+        }
+
+        .rank-score {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Estilo para los Popups de Leaflet */
+        .leaflet-popup-content-wrapper {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(8px);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+        }
+        .leaflet-popup-tip {
+            background: rgba(15, 23, 42, 0.9);
+        }
+        .custom-popup {
+            text-align: center;
+            font-family: 'Outfit', sans-serif;
+        }
+        .custom-popup h3 {
+            margin: 0 0 5px 0;
+            color: #8b5cf6;
+            font-weight: 800;
+        }
+        .custom-popup p {
+            margin: 0;
+            color: #cbd5e1;
+        }
+        .custom-popup hr {
+            border: none;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin: 10px 0;
+        }
+        .custom-popup b {
+            color: #a5b4fc;
+        }
+        
+        .loader {
+            text-align: center;
+            color: #cbd5e1;
+            padding: 20px;
+            font-size: 14px;
+        }
+
+        /* Ocultar barra de scroll en el sidebar para que quede más limpio */
+        .ranking-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .ranking-list::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-panel">
+        <h2>✈️ Airports Live Map</h2>
+        <p>Explora el mundo y descubre los aeropuertos más visitados.</p>
+        <button class="btn-popular" onclick="toggleSidebar()">🏆 Ver Top 10 Populares</button>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3>Top 10 Populares</h3>
+            <button class="close-btn" onclick="toggleSidebar()">×</button>
+        </div>
+        <div class="ranking-list" id="ranking-list">
+            <!-- Cards will be injected here -->
+            <div class="loader">Cargando ranking...</div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+    <script>
+        const API_URL = 'http://localhost:3000';
+
+        const map = L.map('map', { zoomControl: false }).setView([20, 0], 2);
+        
+        // Mover el control de zoom abajo a la derecha para que no estorbe el título
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // Estilo oscuro para el mapa (CartoDB Dark Matter)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 18,
+            attribution: '© OpenStreetMap contributors © CARTO'
+        }).addTo(map);
+
+        const markers = L.markerClusterGroup({
+            chunkedLoading: true
+        });
+
+        // Obtener los datos del Backend (MongoDB)
+        fetch(`${API_URL}/airports`)
+            .then(res => res.json())
+            .then(airports => {
+                airports.forEach(ap => {
+                    if (ap.lat && ap.lng) {
+                        const marker = L.marker([ap.lat, ap.lng]);
+
+                        marker.on('click', () => {
+                            fetch(`${API_URL}/airports/${ap.iata_faa}`)
+                                .then(res => res.json())
+                                .then(detail => {
+                                    marker.bindPopup(`
+                                        <div class="custom-popup">
+                                            <h3>${detail.name}</h3>
+                                            <p>${detail.city}</p>
+                                            <hr>
+                                            <p><b>IATA:</b> ${detail.iata_faa}</p>
+                                            <p><b>Altitud:</b> ${detail.alt} ft</p>
+                                            <p><b>Zona:</b> ${detail.tz}</p>
+                                        </div>
+                                    `).openPopup();
+                                    
+                                    // Si el sidebar está abierto, actualizarlo en vivo al hacer clic
+                                    if(document.getElementById('sidebar').classList.contains('open')) {
+                                        loadPopular();
+                                    }
+                                });
+                        });
+
+                        markers.addLayer(marker);
+                    }
+                });
+                map.addLayer(markers);
+            })
+            .catch(err => console.error("Error conectando con la API:", err));
+
+        // Logic for Sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('open');
+            if (sidebar.classList.contains('open')) {
+                loadPopular();
+            }
+        }
+
+        function loadPopular() {
+            const list = document.getElementById('ranking-list');
+            list.innerHTML = '<div class="loader">Cargando ranking...</div>';
+            
+            fetch(`${API_URL}/airports/popular`)
+                .then(res => res.json())
+                .then(data => {
+                    if(data.length === 0) {
+                        list.innerHTML = '<div class="loader">Nadie ha hecho clic en un aeropuerto aún. ¡Empieza a explorar el mapa!</div>';
+                        return;
+                    }
+                    
+                    let html = '';
+                    data.forEach((ap, index) => {
+                        html += `
+                        <div class="ranking-card">
+                            <div class="rank-number">#${index + 1}</div>
+                            <div class="rank-info">
+                                <h4 class="rank-name">${ap.name || ap.iata}</h4>
+                                <p class="rank-city">${ap.city || 'Desconocido'}</p>
+                            </div>
+                            <div class="rank-score">
+                                👁️ ${ap.score}
+                            </div>
+                        </div>
+                        `;
+                    });
+                    list.innerHTML = html;
+                })
+                .catch(err => {
+                    console.error(err);
+                    list.innerHTML = '<div class="loader">Error cargando el ranking.</div>';
+                });
+        }
+    </script>
+</body>
+</html>

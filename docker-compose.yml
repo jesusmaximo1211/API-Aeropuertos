@@ -1,0 +1,55 @@
+services:
+  # 1. Base de datos MongoDB (Almacenamiento principal)
+  mongo-heroes:
+    image: mongo:latest
+    container_name: mongo-heroes
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  # 2. Base de datos Redis (Cálculos de cercanía)
+  redis-geo:
+    image: redis:latest
+    container_name: redis-geo
+    ports:
+      - "6379:6379"
+
+  # 2.5 Base de datos Redis (Popularidad)
+  redis-pop:
+    image: redis:latest
+    container_name: redis-pop
+    ports:
+      - "6381:6379"
+
+  # 3. Tu API REST (Backend)
+  backend:
+    build: ./backend
+    container_name: airports-backend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo-heroes
+      - redis-geo
+      - redis-pop
+    volumes:
+      - ./data_trasport.json:/app/data_trasport.json
+    environment:
+      # Le pasamos las URLs internas de Docker para que se conecte
+      - MONGO_URL=mongodb://mongo-heroes:27017/airport_db
+      - REDIS_HOST=redis-geo
+      - REDIS_PORT=6379
+      - REDIS_POP_HOST=redis-pop
+      - REDIS_POP_PORT=6379
+
+  # 4. Interfaz Visual (Frontend Leaflet)
+  frontend:
+    build: ./frontend
+    container_name: airports-frontend
+    ports:
+      - "5500:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data: # Esto guarda los datos para que no se borren si apagas la PC
